@@ -21,10 +21,13 @@
         .glass-card {
             background: rgba(25, 25, 25, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.2s ease;
         }
+        .glass-card:hover { transform: translateY(-2px); }
         .login-gradient {
             background: radial-gradient(circle at top right, #301010, #0f0f0f);
         }
+        .video-thumb:hover .overlay { opacity: 1; }
         @media (max-width: 768px) {
             .main-content { margin-bottom: 70px; margin-left: 0 !important; }
         }
@@ -34,7 +37,7 @@
 
     <!-- APP WRAPPER -->
     <div id="main-wrapper" class="hidden">
-        <!-- SIDE NAVIGATION (Desktop) -->
+        <!-- SIDE NAVIGATION -->
         <nav class="hidden md:flex fixed left-0 top-0 h-screen w-20 flex-col items-center py-8 border-r border-white/5 bg-[#0f0f0f] z-50">
             <div class="mb-10 text-red-600">
                 <i data-lucide="youtube" class="w-8 h-8"></i>
@@ -55,22 +58,6 @@
             </button>
         </nav>
 
-        <!-- BOTTOM NAVIGATION (Mobile) -->
-        <nav class="md:hidden fixed bottom-0 left-0 w-full h-16 bg-[#121212] border-t border-white/5 flex justify-around items-center z-50">
-            <button onclick="router.navigate('dashboard')" class="nav-item p-2 flex flex-col items-center text-xs gap-1" data-page="dashboard">
-                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                <span>Home</span>
-            </button>
-            <button onclick="router.navigate('content')" class="nav-item p-2 flex flex-col items-center text-xs gap-1" data-page="content">
-                <i data-lucide="play-square" class="w-5 h-5"></i>
-                <span>Videos</span>
-            </button>
-            <button onclick="router.navigate('upload')" class="nav-item p-2 flex flex-col items-center text-xs gap-1" data-page="upload">
-                <i data-lucide="plus-circle" class="w-5 h-5 text-red-500"></i>
-                <span>Upload</span>
-            </button>
-        </nav>
-
         <main id="app-root" class="main-content md:ml-20 p-4 md:p-8 min-h-screen">
             <!-- Dynamic Content -->
         </main>
@@ -80,23 +67,18 @@
     <div id="login-screen" class="min-h-screen flex items-center justify-center p-6 login-gradient">
         <div class="max-w-md w-full text-center space-y-8">
             <div class="inline-flex p-5 bg-red-600/10 rounded-3xl">
-                <i data-lucide="youtube" class="w-16 h-16 text-red-600"></i>
+                <i data-lucide="youtube" class="w-16 h-16 text-red-600 animate-pulse"></i>
             </div>
             <div>
                 <h1 class="text-4xl font-black tracking-tight">ProTube <span class="text-red-600">Studio</span></h1>
-                <p class="text-gray-400 mt-3">Manage your channel content professionally</p>
+                <p class="text-gray-400 mt-3">Managed Channel Content & Real-time Insights</p>
             </div>
-            <button onclick="auth.login()" class="w-full bg-white text-black py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-3 shadow-2xl">
+            <button id="login-btn" onclick="auth.login()" class="w-full bg-white text-black py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-3 shadow-2xl">
                 <i data-lucide="globe"></i>
-                Sign in with Google
+                Connect Studio Account
             </button>
-            <p class="text-xs text-gray-600">By signing in, you agree to connect your YouTube Data to this dashboard.</p>
+            <p id="error-display" class="text-xs text-red-500 hidden"></p>
         </div>
-    </div>
-
-    <!-- MODAL -->
-    <div id="modal-container" class="fixed inset-0 bg-black/80 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div id="modal-content" class="glass-card w-full max-w-lg rounded-2xl p-6"></div>
     </div>
 
     <!-- TOAST -->
@@ -108,7 +90,7 @@
         const CLIENT_ID = '506796889372-c4v5dqogo1ue4sek0noti1uhlrd74gdi.apps.googleusercontent.com'; 
 
         const state = {
-            accessToken: null,
+            accessToken: localStorage.getItem('yt_studio_token'),
             channel: null,
             videos: [],
             currentPage: 'dashboard'
@@ -117,59 +99,64 @@
         const Components = {
             Dashboard: () => {
                 const stats = state.channel?.statistics || { subscriberCount: '0', viewCount: '0', videoCount: '0' };
+                const chUrl = `https://www.youtube.com/channel/${state.channel?.id}`;
+                
                 return `
                 <div class="max-w-6xl mx-auto">
-                    <header class="mb-10">
-                        <div class="flex items-center gap-4 mb-2">
-                            <img src="${state.channel?.snippet?.thumbnails?.default?.url}" class="w-12 h-12 rounded-full border border-white/10">
+                    <header class="mb-10 flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <a href="${chUrl}" target="_blank" class="block hover:opacity-80 transition">
+                                <img src="${state.channel?.snippet?.thumbnails?.high?.url || 'https://via.placeholder.com/48'}" class="w-14 h-14 rounded-full border-2 border-red-600/20 p-0.5">
+                            </a>
                             <div>
-                                <h1 class="text-2xl font-bold">${state.channel?.snippet?.title || 'Channel Analytics'}</h1>
-                                <p class="text-gray-400 text-sm">Welcome back to your studio</p>
+                                <h1 class="text-2xl font-bold">${state.channel?.snippet?.title || 'Studio Dashboard'}</h1>
+                                <a href="${chUrl}" target="_blank" class="text-red-500 text-xs font-semibold flex items-center gap-1 hover:underline">
+                                    View on YouTube <i data-lucide="external-link" class="w-3 h-3"></i>
+                                </a>
                             </div>
+                        </div>
+                        <div class="flex gap-2">
+                             <button onclick="actions.fetchChannelData()" class="p-3 bg-white/5 rounded-xl hover:bg-white/10 transition"><i data-lucide="refresh-cw" class="w-5 h-5"></i></button>
                         </div>
                     </header>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                        <div class="glass-card p-6 rounded-3xl">
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500"><i data-lucide="users" class="w-5 h-5"></i></div>
-                                <span class="text-xs text-blue-500 font-bold">LIVE</span>
-                            </div>
-                            <p class="text-gray-400 text-sm mb-1">Total Subscribers</p>
+                        <div class="glass-card p-6 rounded-3xl border-l-4 border-l-blue-500">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Subscribers</p>
                             <h2 class="text-4xl font-black">${Number(stats.subscriberCount).toLocaleString()}</h2>
                         </div>
-                        <div class="glass-card p-6 rounded-3xl">
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500"><i data-lucide="eye" class="w-5 h-5"></i></div>
-                            </div>
-                            <p class="text-gray-400 text-sm mb-1">Total Lifetime Views</p>
+                        <div class="glass-card p-6 rounded-3xl border-l-4 border-l-purple-500">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Lifetime Views</p>
                             <h2 class="text-4xl font-black">${Number(stats.viewCount).toLocaleString()}</h2>
                         </div>
-                        <div class="glass-card p-6 rounded-3xl">
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="p-2 bg-red-500/10 rounded-lg text-red-500"><i data-lucide="video" class="w-5 h-5"></i></div>
-                            </div>
-                            <p class="text-gray-400 text-sm mb-1">Uploaded Videos</p>
+                        <div class="glass-card p-6 rounded-3xl border-l-4 border-l-red-500">
+                            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Videos</p>
                             <h2 class="text-4xl font-black">${Number(stats.videoCount).toLocaleString()}</h2>
                         </div>
                     </div>
 
-                    <div class="glass-card rounded-3xl overflow-hidden">
-                        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                            <h3 class="font-bold flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4"></i> Recent Activity</h3>
-                            <button onclick="router.navigate('content')" class="text-red-500 text-sm font-semibold hover:underline">Manage Content</button>
+                    <div class="glass-card rounded-[2rem] overflow-hidden">
+                        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                            <h3 class="font-bold">Recent Uploads</h3>
+                            <button onclick="router.navigate('content')" class="text-xs font-bold bg-white/5 px-4 py-2 rounded-lg hover:bg-white/10 transition">MANAGE ALL</button>
                         </div>
-                        <div class="p-10 text-center">
+                        <div class="p-6">
                             ${state.videos.length > 0 ? 
-                                `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                     ${state.videos.slice(0, 4).map(v => `
-                                        <div class="text-left">
-                                            <img src="${v.snippet.thumbnails.medium.url}" class="rounded-xl mb-2 aspect-video object-cover">
-                                            <p class="text-sm font-bold line-clamp-2">${v.snippet.title}</p>
+                                        <div class="group">
+                                            <a href="https://www.youtube.com/watch?v=${v.id.videoId || v.id}" target="_blank" class="block relative mb-3 overflow-hidden rounded-2xl">
+                                                <img src="${v.snippet.thumbnails.medium.url}" class="w-full aspect-video object-cover transition duration-500 group-hover:scale-110">
+                                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <i data-lucide="play" class="fill-white text-white w-10 h-10"></i>
+                                                </div>
+                                            </a>
+                                            <a href="https://www.youtube.com/watch?v=${v.id.videoId || v.id}" target="_blank" class="text-sm font-bold line-clamp-2 hover:text-red-500 transition cursor-pointer">${v.snippet.title}</a>
+                                            <p class="text-[10px] text-gray-500 mt-1">${new Date(v.snippet.publishedAt).toLocaleDateString()}</p>
                                         </div>
                                     `).join('')}
                                 </div>` 
-                                : '<p class="text-gray-500">Sync your channel to see latest uploads.</p>'}
+                                : '<div class="py-20 text-center text-gray-600 flex flex-col items-center gap-3"><i data-lucide="video-off" class="w-10 h-10 opacity-20"></i> No videos found. Ensure you have public uploads.</div>'}
                         </div>
                     </div>
                 </div>
@@ -180,48 +167,47 @@
                 <div class="max-w-6xl mx-auto">
                     <header class="mb-8 flex justify-between items-end">
                         <div>
-                            <h1 class="text-3xl font-bold">Content</h1>
-                            <p class="text-gray-400 text-sm">Manage and edit your channel videos</p>
+                            <h1 class="text-3xl font-bold">Channel Content</h1>
+                            <p class="text-gray-400 text-sm">Review and manage your original uploads</p>
                         </div>
-                        <button onclick="router.navigate('upload')" class="bg-red-600 px-6 py-2 rounded-xl text-sm font-bold hover:bg-red-700 transition flex items-center gap-2">
+                        <button onclick="router.navigate('upload')" class="bg-red-600 px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition flex items-center gap-2 shadow-lg shadow-red-600/20">
                             <i data-lucide="plus" class="w-4 h-4"></i> Create
                         </button>
                     </header>
 
-                    <div class="glass-card rounded-3xl overflow-x-auto">
+                    <div class="glass-card rounded-[2rem] overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-white/5 text-gray-500 text-[10px] uppercase tracking-widest font-bold">
+                            <thead class="bg-white/5 text-gray-500 text-[10px] uppercase tracking-[0.2em] font-black">
                                 <tr>
-                                    <th class="p-6">Video</th>
+                                    <th class="p-6">Video details</th>
                                     <th class="p-6">Visibility</th>
-                                    <th class="p-6">Published</th>
-                                    <th class="p-6 text-center">Actions</th>
+                                    <th class="p-6">Date</th>
+                                    <th class="p-6 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5">
-                                ${state.videos.length === 0 ? `
-                                    <tr><td colspan="4" class="p-20 text-center text-gray-500">No content found.</td></tr>
-                                ` : state.videos.map(v => `
-                                    <tr class="hover:bg-white/[0.02] transition">
-                                        <td class="p-6 flex gap-4 items-center min-w-[300px]">
-                                            <div class="relative flex-shrink-0">
-                                                <img src="${v.snippet.thumbnails.default.url}" class="w-24 rounded-lg shadow-lg">
-                                            </div>
+                                ${state.videos.map(v => `
+                                    <tr class="hover:bg-white/[0.01] transition group">
+                                        <td class="p-6 flex gap-5 items-start">
+                                            <a href="https://www.youtube.com/watch?v=${v.id.videoId || v.id}" target="_blank" class="relative flex-shrink-0 block rounded-lg overflow-hidden w-32 shadow-xl">
+                                                <img src="${v.snippet.thumbnails.default.url}" class="w-full">
+                                                <div class="absolute inset-0 bg-red-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                            </a>
                                             <div>
-                                                <p class="font-bold text-sm line-clamp-2 mb-1">${v.snippet.title}</p>
-                                                <p class="text-[10px] text-gray-600 font-mono">${v.id}</p>
+                                                <a href="https://www.youtube.com/watch?v=${v.id.videoId || v.id}" target="_blank" class="font-bold text-sm block hover:text-red-500 transition mb-1">${v.snippet.title}</a>
+                                                <p class="text-[10px] text-gray-600 font-mono tracking-tighter">ID: ${v.id.videoId || v.id}</p>
                                             </div>
                                         </td>
                                         <td class="p-6">
                                             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-green-500/10 text-green-500 border border-green-500/10">Public</span>
                                         </td>
-                                        <td class="p-6 text-xs text-gray-400 font-medium">
-                                            ${new Date(v.snippet.publishedAt).toLocaleDateString(undefined, {dateStyle: 'medium'})}
+                                        <td class="p-6 text-xs text-gray-400">
+                                            ${new Date(v.snippet.publishedAt).toLocaleDateString()}
                                         </td>
-                                        <td class="p-6">
-                                            <div class="flex justify-center gap-3">
-                                                <button onclick="actions.openEdit('${v.id}')" class="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-blue-400 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                                                <button onclick="actions.deleteVideo('${v.id}')" class="p-2.5 bg-white/5 hover:bg-red-500/20 rounded-xl text-red-500 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <td class="p-6 text-right">
+                                            <div class="flex justify-end gap-2">
+                                                <a href="https://www.youtube.com/watch?v=${v.id.videoId || v.id}" target="_blank" class="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 transition" title="Open on YouTube"><i data-lucide="external-link" class="w-4 h-4"></i></a>
+                                                <button onclick="ui.showToast('Edit feature coming soon')" class="p-2.5 bg-white/5 hover:bg-blue-500/20 rounded-xl text-blue-400 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -233,60 +219,23 @@
             `,
 
             Upload: () => `
-                <div class="max-w-2xl mx-auto">
-                    <header class="mb-10 text-center">
-                        <h1 class="text-4xl font-black">Upload</h1>
-                        <p class="text-gray-400 mt-2">Publish new content to your audience</p>
-                    </header>
-
-                    <div class="glass-card p-10 rounded-[2.5rem] shadow-2xl space-y-8">
-                        <div class="space-y-6">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Video Title</label>
-                                <input type="text" id="up-title" class="w-full bg-white/5 border border-white/5 rounded-2xl p-4 focus:border-red-500 outline-none transition-all placeholder:text-gray-700" placeholder="Enter a catchy title">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Description</label>
-                                <textarea id="up-desc" class="w-full bg-white/5 border border-white/5 rounded-2xl p-4 focus:border-red-500 outline-none h-40 transition-all placeholder:text-gray-700" placeholder="Tell viewers about your video"></textarea>
-                            </div>
-                            <div class="p-8 border-2 border-dashed border-white/5 rounded-[2rem] text-center hover:border-red-500 transition-colors group cursor-pointer relative">
-                                <i data-lucide="clapperboard" class="mx-auto h-12 w-12 text-gray-600 group-hover:text-red-500 transition-colors mb-4"></i>
-                                <p class="text-sm text-gray-400">Drag and drop video file or <span class="text-red-500 font-bold">Browse</span></p>
-                                <input type="file" id="up-file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer">
-                            </div>
+                <div class="max-w-xl mx-auto py-10">
+                    <div class="text-center mb-10">
+                        <div class="inline-flex p-4 bg-red-600/10 rounded-2xl text-red-600 mb-4"><i data-lucide="cloud-upload" class="w-10 h-10"></i></div>
+                        <h1 class="text-3xl font-black">Ready to Publish?</h1>
+                        <p class="text-gray-500">Upload high-quality videos to your channel</p>
+                    </div>
+                    <div class="glass-card p-10 rounded-[2.5rem] space-y-6">
+                        <div class="p-12 border-2 border-dashed border-white/5 rounded-3xl text-center hover:border-red-600/50 transition cursor-pointer bg-white/[0.01]">
+                            <i data-lucide="file-video" class="mx-auto h-12 w-12 text-gray-700 mb-4"></i>
+                            <p class="text-sm font-medium">Select your video file</p>
+                            <p class="text-[10px] text-gray-600 mt-2 uppercase">MP4, MOV, or AVI preferred</p>
+                            <input type="file" class="absolute inset-0 opacity-0 cursor-pointer">
                         </div>
-
-                        <button onclick="actions.handleUpload()" class="w-full bg-red-600 py-5 rounded-2xl font-black text-lg hover:bg-red-700 transition shadow-xl shadow-red-600/10 flex items-center justify-center gap-3">
-                            <i data-lucide="zap"></i> PUBLISH NOW
-                        </button>
+                        <button onclick="ui.showToast('Upload simulation started...')" class="w-full bg-white text-black py-5 rounded-2xl font-black text-lg hover:bg-gray-200 transition">START UPLOAD</button>
                     </div>
                 </div>
-            `,
-
-            EditModal: (videoId) => {
-                const video = state.videos.find(v => v.id === videoId);
-                return `
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-2xl font-black tracking-tight">Edit Details</h2>
-                        <button onclick="ui.closeModal()" class="p-2 hover:bg-white/10 rounded-full transition"><i data-lucide="x"></i></button>
-                    </div>
-                    <div class="space-y-5">
-                        <div class="bg-black/20 p-4 rounded-2xl mb-4 flex gap-4">
-                             <img src="${video.snippet.thumbnails.default.url}" class="w-20 rounded-lg">
-                             <p class="text-xs text-gray-500 italic">Editing: ${video.id}</p>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-600 uppercase mb-2">Title</label>
-                            <input type="text" id="edit-title" value="${video.snippet.title}" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-600 uppercase mb-2">Description</label>
-                            <textarea id="edit-desc" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none h-32 focus:border-blue-500">${video.snippet.description}</textarea>
-                        </div>
-                        <button onclick="actions.saveEdit('${videoId}')" class="w-full bg-white text-black py-4 rounded-xl font-black hover:bg-gray-200 transition mt-4">UPDATE METADATA</button>
-                    </div>
-                `;
-            }
+            `
         };
 
         const ui = {
@@ -295,9 +244,6 @@
                 const page = state.currentPage.charAt(0).toUpperCase() + state.currentPage.slice(1);
                 root.innerHTML = Components[page]();
                 lucide.createIcons();
-                document.querySelectorAll('.nav-item').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.page === state.currentPage);
-                });
             },
             toggleApp: (isLoggedIn) => {
                 document.getElementById('login-screen').classList.toggle('hidden', isLoggedIn);
@@ -308,21 +254,11 @@
                 toast.innerText = msg;
                 toast.style.transform = "translateX(0)";
                 setTimeout(() => toast.style.transform = "translateX(150%)", 3000);
-            },
-            openModal: (content) => {
-                const modal = document.getElementById('modal-container');
-                document.getElementById('modal-content').innerHTML = content;
-                modal.classList.remove('hidden');
-                lucide.createIcons();
-            },
-            closeModal: () => {
-                document.getElementById('modal-container').classList.add('hidden');
             }
         };
 
         const router = {
             navigate: (page) => {
-                if(!state.accessToken) return;
                 state.currentPage = page;
                 ui.render();
             }
@@ -332,78 +268,69 @@
             login: () => {
                 const client = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
+                    scope: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
                     callback: (response) => {
                         if (response.access_token) {
                             state.accessToken = response.access_token;
+                            localStorage.setItem('yt_studio_token', response.access_token);
                             ui.toggleApp(true);
-                            ui.showToast("Logged in successfully!");
                             actions.fetchChannelData();
                         }
-                    },
+                    }
                 });
                 client.requestAccessToken();
             },
             logout: () => {
+                localStorage.removeItem('yt_studio_token');
                 state.accessToken = null;
-                state.channel = null;
-                state.videos = [];
                 ui.toggleApp(false);
+            },
+            checkSession: () => {
+                if(state.accessToken) {
+                    ui.toggleApp(true);
+                    actions.fetchChannelData();
+                }
             }
         };
 
         const actions = {
             fetchChannelData: async () => {
                 try {
-                    // Fetch Channel Stats
+                    // 1. Channel Statistics
                     const chRes = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
                         headers: { 'Authorization': `Bearer ${state.accessToken}` }
                     });
-                    const chData = await chRes.json();
-                    state.channel = chData.items[0];
+                    
+                    if(chRes.status === 401) {
+                        auth.logout();
+                        ui.showToast("Session expired. Please log in again.");
+                        return;
+                    }
 
-                    // Fetch Videos
-                    const vidRes = await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,status&myRating=like&maxResults=10', {
+                    const chData = await chRes.json();
+                    if(chData.items) state.channel = chData.items[0];
+
+                    // 2. Channel's Original Videos
+                    // We search for videos uploaded by the user
+                    const vidRes = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&forMine=true&type=video&maxResults=20&order=date', {
                         headers: { 'Authorization': `Bearer ${state.accessToken}` }
                     });
                     const vidData = await vidRes.json();
                     state.videos = vidData.items || [];
                     
                     ui.render();
+                    ui.showToast("Studio data synchronized!");
                 } catch (e) {
-                    ui.showToast("Failed to sync channel data.");
+                    ui.showToast("Error connecting to YouTube servers.");
                 }
-            },
-
-            openEdit: (id) => ui.openModal(Components.EditModal(id)),
-
-            saveEdit: (id) => {
-                const title = document.getElementById('edit-title').value;
-                const index = state.videos.findIndex(v => v.id === id);
-                state.videos[index].snippet.title = title;
-                ui.closeModal();
-                ui.render();
-                ui.showToast("Updated (UI Mockup)");
-            },
-
-            deleteVideo: (id) => {
-                if(confirm("Permanently delete this video?")) {
-                    state.videos = state.videos.filter(v => v.id !== id);
-                    ui.render();
-                    ui.showToast("Video removed.");
-                }
-            },
-
-            handleUpload: () => {
-                ui.showToast("Uploading... (Mock Simulation)");
-                setTimeout(() => {
-                    ui.showToast("Upload Successful!");
-                    router.navigate('content');
-                }, 2500);
             }
         };
 
-        window.onload = () => lucide.createIcons();
+        // Initialize App
+        window.onload = () => {
+            lucide.createIcons();
+            auth.checkSession();
+        };
     </script>
 </body>
 </html>
