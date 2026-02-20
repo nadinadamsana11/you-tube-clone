@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube වීඩියෝ අප්ලෝඩර්</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f9f9f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .upload-container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #ff0000;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="upload-container">
+        <h1 class="text-2xl font-bold text-center mb-6 text-red-600">YouTube වීඩියෝ අප්ලෝඩර්</h1>
+        
+        <div id="auth-section" class="text-center mb-6">
+            <button id="authorize-button" class="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition">
+                Google ගිණුමෙන් ඇතුළු වන්න
+            </button>
+            <p id="user-info" class="mt-2 text-sm text-gray-600 hidden"></p>
+        </div>
+
+        <div id="upload-form" class="space-y-4 opacity-50 pointer-events-none">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">වීඩියෝ මාතෘකාව (Title)</label>
+                <input type="text" id="video-title" class="w-full border p-2 rounded mt-1" placeholder="වීඩියෝවේ නම ඇතුළත් කරන්න">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">විස්තරය (Description)</label>
+                <textarea id="video-desc" class="w-full border p-2 rounded mt-1" rows="3" placeholder="වීඩියෝව ගැන විස්තරයක්..."></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">වීඩියෝ ගොනුව තෝරන්න (Select File)</label>
+                <input type="file" id="video-file" accept="video/*" class="w-full mt-1">
+            </div>
+
+            <button id="upload-button" class="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition">
+                Upload කිරීම ආරම්භ කරන්න
+            </button>
+        </div>
+
+        <div class="mt-6">
+            <div class="progress-bar" id="progress-container">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p id="status-message" class="text-center mt-3 text-sm font-medium text-gray-600"></p>
+        </div>
+    </div>
+
+    <!-- Google Identity Services Library -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <script>
+        // --- මෙහි ඔබගේ API විස්තර ඇතුළත් කරන්න ---
+        const CLIENT_ID = '506796889372-c4v5dqogo1ue4sek0noti1uhlrd74gdi.apps.googleusercontent.com'; 
+        const API_KEY = 'AIzaSyAQIgo0q8ZybHdK9Ct_gDYORT1HhkoRPFg';
+        // ---------------------------------------
+
+        let accessToken = null;
+        let tokenClient = null;
+
+        const authButton = document.getElementById('authorize-button');
+        const uploadForm = document.getElementById('upload-form');
+        const uploadButton = document.getElementById('upload-button');
+        const statusMsg = document.getElementById('status-message');
+        const progressBar = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+
+        // Google script එක load වී අවසන් දැයි පරීක්ෂා කිරීමේ ශ්‍රිතය
+        function initGoogleAPI() {
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/youtube.upload',
+                    callback: (response) => {
+                        if (response.access_token) {
+                            accessToken = response.access_token;
+                            authButton.innerText = "සාර්ථකව සම්බන්ධ විය ✅";
+                            authButton.classList.replace('bg-blue-600', 'bg-green-600');
+                            uploadForm.style.opacity = "1";
+                            uploadForm.style.pointerEvents = "auto";
+                            statusMsg.innerText = "දැන් ඔබට වීඩියෝ අප්ලෝඩ් කළ හැක.";
+                        }
+                    },
+                });
+            } else {
+                // තවමත් load වී නොමැති නම් තත්පරයකින් නැවත උත්සාහ කරන්න
+                setTimeout(initGoogleAPI, 100);
+            }
+        }
+
+        // Window load වූ පසු ආරම්භ කරන්න
+        window.onload = initGoogleAPI;
+
+        authButton.onclick = () => {
+            if (tokenClient) {
+                tokenClient.requestAccessToken();
+            } else {
+                statusMsg.innerText = "Google API තවමත් සූදානම් නැත. කරුණාකර තත්පරයක් රැඳී සිටින්න.";
+            }
+        };
+
+        // Video Upload Function
+        uploadButton.onclick = async () => {
+            const file = document.getElementById('video-file').files[0];
+            const title = document.getElementById('video-title').value;
+            const desc = document.getElementById('video-desc').value;
+
+            if (!file || !title) {
+                statusMsg.innerText = "කරුණාකර මාතෘකාව සහ වීඩියෝව තෝරන්න!";
+                return;
+            }
+
+            statusMsg.innerText = "සූදානම් වෙමින් පවතී...";
+            progressBar.style.display = "block";
+
+            const metadata = {
+                snippet: {
+                    title: title,
+                    description: desc,
+                    categoryId: '22'
+                },
+                status: {
+                    privacyStatus: 'public'
+                }
+            };
+
+            const formData = new FormData();
+            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    progressFill.style.width = "100%";
+                    statusMsg.innerHTML = `සාර්ථකයි! වීඩියෝව අප්ලෝඩ් විය. <br> <a href="https://youtu.be/${result.id}" target="_blank" class="text-blue-600 underline">වීඩියෝව බලන්න</a>`;
+                } else {
+                    const error = await response.json();
+                    statusMsg.innerText = "දෝෂයකි: " + error.error.message;
+                }
+            } catch (err) {
+                statusMsg.innerText = "සම්බන්ධතා දෝෂයකි!";
+                console.error(err);
+            }
+        };
+    </script>
+</body>
+</html>
